@@ -1,0 +1,26 @@
+syntax = "proto3";
+
+package authservice;
+
+option go_package = "authservice.authservice.v1;authservicev1";
+
+service AuthService{
+  rpc Register(User) returns (AuthResponse);
+  rpc Login(UserCreds) returns (AuthResponse);
+}
+
+message User {
+  string name = 1;
+  string email = 2;
+  string pass = 3;
+}
+
+message UserCreds {
+  string email = 1;
+  string pass = 2;
+}
+
+message AuthResponse {
+  string token = 1;
+  string message = 2;
+}
