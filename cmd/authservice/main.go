@@ -48,7 +48,7 @@ func main() {
 	grpcServer := grpc.NewServer()
 	server.RegisterAuthService(grpcServer, db)
 	// Слушаем порт
-	listener, err := net.Listen("tcp", ":5050")
+	listener, err := net.Listen("tcp", ":8081")
 	if err != nil {
 		zLog.Fatal().Err(err).Msg("failed to listen")
 	}

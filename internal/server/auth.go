@@ -2,6 +2,7 @@ package server
 
 import (
 	authservicev1 "auth_service/gen/go"
+	"auth_service/internal/logger"
 	"auth_service/internal/models"
 	"context"
 	"github.com/golang-jwt/jwt/v5"
@@ -11,6 +12,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"gorm.io/gorm"
+	"strings"
 	"time"
 )
 
@@ -33,6 +35,8 @@ func RegisterAuthService(gRPC *grpc.Server, db *gorm.DB) {
 }
 
 func (as *AuthService) Register(_ context.Context, req *authservicev1.User) (*authservicev1.AuthResponse, error) {
+	zLog := logger.Get()
+	zLog.Debug().Any("req", req).Msg("Register (grpc auth_service)")
 	hash, err := hashPassword(req.Pass)
 	if err != nil {
 		return nil, status.Error(codes.Internal, "Failed to hash password")
@@ -46,13 +50,18 @@ func (as *AuthService) Register(_ context.Context, req *authservicev1.User) (*au
 		DeletedUser: false,
 	}
 	if err := as.db.Create(user).Error; err != nil {
-		return nil, status.Error(codes.Internal, "Failed to create user")
+		if strings.Contains(err.Error(), "SQLSTATE 23505") {
+			zLog.Error().Err(err).Msg("SQL error: user already exists")
+			return nil, status.Error(codes.AlreadyExists, "User already exists in DB")
+		}
+		return nil, status.Error(codes.Internal, "Failed to create user DB")
 	}
 	//add JWT
 	token, err := createJWT(uid)
 	if err != nil {
 		return nil, status.Error(codes.Internal, "Failed to create JWT")
 	}
+	zLog.Debug().Any("token", token).Msg("Success register user")
 	return &authservicev1.AuthResponse{
 		Token:   token,
 		Message: "Success register user",
@@ -60,6 +69,8 @@ func (as *AuthService) Register(_ context.Context, req *authservicev1.User) (*au
 }
 
 func (as *AuthService) Login(_ context.Context, userCreds *authservicev1.UserCreds) (*authservicev1.AuthResponse, error) {
+	zLog := logger.Get()
+	zLog.Debug().Any("userCreds", userCreds).Msg("Register (grpc auth_service)")
 	var user models.User
 	if err := as.db.Where("email = ?", userCreds.Email).First(&user).Error; err != nil {
 		return nil, status.Error(codes.NotFound, "User not found")
@@ -72,6 +83,7 @@ func (as *AuthService) Login(_ context.Context, userCreds *authservicev1.UserCre
 	if err != nil {
 		return nil, status.Error(codes.Internal, "Failed to create JWT")
 	}
+	zLog.Debug().Any("token", token).Msg("Success login")
 	return &authservicev1.AuthResponse{
 		Token:   token,
 		Message: "Success login",
